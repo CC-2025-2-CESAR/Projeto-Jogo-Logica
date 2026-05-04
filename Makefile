@@ -1,0 +1,74 @@
+# ============================================================================
+# Makefile - nome_indefinido
+# ============================================================================
+#
+# Estrutura modular:
+#   src/core/         loop principal, contrato (tipos.h), colisao
+#   src/entidades/    jogador, inimigos, magias, obstaculos
+#   src/sistemas/     profecia, onda, cartas, dados, salvamento
+#   src/interface/    hud
+#
+# Cada modulo eh uma pasta. O Makefile descobre automaticamente todos os
+# .c e adiciona cada subpasta no -I do compilador, entao os #include
+# continuam podendo ser por nome simples (ex.: #include "tipos.h").
+# ============================================================================
+
+CC := gcc
+PKG_CONFIG := pkg-config
+
+# Descobre todos os .c em src/ e em qualquer subpasta direta de src/.
+FONTES := $(wildcard src/*.c) $(wildcard src/*/*.c)
+
+# -I para cada modulo, pra que #include "header.h" funcione sem precisar
+# escrever o caminho completo.
+INCLUDES := -Isrc -Isrc/core -Isrc/entidades -Isrc/sistemas -Isrc/interface
+
+OBJETOS := $(patsubst src/%.c,build/%.o,$(FONTES))
+
+ifeq ($(OS),Windows_NT)
+    EXECUTAVEL := nome_indefinido.exe
+    COMANDO_EXECUTAR := .\nome_indefinido.exe
+    CFLAGS := -Wall -Wextra -std=c11 -g $(INCLUDES) $(shell $(PKG_CONFIG) --cflags raylib)
+    LDFLAGS := $(shell $(PKG_CONFIG) --libs raylib) -lopengl32 -lgdi32 -lwinmm -lm
+    define CRIAR_PASTA
+        if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
+    endef
+else
+    EXECUTAVEL := nome_indefinido
+    COMANDO_EXECUTAR := ./nome_indefinido
+    CFLAGS := -Wall -Wextra -std=c11 -g $(INCLUDES) $(shell $(PKG_CONFIG) --cflags raylib)
+    LDFLAGS := $(shell $(PKG_CONFIG) --libs raylib) -lm
+    define CRIAR_PASTA
+        mkdir -p $(1)
+    endef
+endif
+
+.PHONY: all run executar clean limpar
+
+all: $(EXECUTAVEL)
+
+$(EXECUTAVEL): $(OBJETOS)
+	$(CC) $(OBJETOS) -o $@ $(LDFLAGS)
+	@echo.
+	@echo Base compilada com sucesso.
+	@echo.
+
+build/%.o: src/%.c
+	@$(call CRIAR_PASTA,$(dir $@))
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(EXECUTAVEL)
+	$(COMANDO_EXECUTAR)
+
+executar: run
+
+clean:
+ifeq ($(OS),Windows_NT)
+	@if exist build rmdir /S /Q build
+	@if exist nome_indefinido.exe del /Q nome_indefinido.exe
+	@if exist nome_indefinido del /Q nome_indefinido
+else
+	rm -rf build nome_indefinido nome_indefinido.exe
+endif
+
+limpar: clean
