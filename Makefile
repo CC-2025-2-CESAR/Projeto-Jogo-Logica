@@ -2,6 +2,10 @@
 # Makefile - Logic Gates Adventure
 # ============================================================================
 #
+# Linux/macOS : make
+# Windows     : use build.bat  (mais simples) ou
+#               make RAYLIB_PATH=C:/raylib
+#
 # Estrutura:
 #   src/core/         main.c, game.c, tipos.h
 #   src/entidades/    player.c
@@ -9,42 +13,64 @@
 #   src/interface/    ui.c
 # ============================================================================
 
-CC         := gcc
-PKG_CONFIG := pkg-config
-
+CC       := gcc
 FONTES   := $(wildcard src/*.c) $(wildcard src/*/*.c)
 INCLUDES := -Isrc -Isrc/core -Isrc/entidades -Isrc/sistemas -Isrc/interface
-
 OBJETOS  := $(patsubst src/%.c,build/%.o,$(FONTES))
 
-RAYLIB_INC := $(shell \
-    if pkg-config --exists raylib 2>/dev/null; then pkg-config --cflags raylib; \
-    elif [ -f /usr/local/include/raylib.h ]; then echo "-I/usr/local/include"; \
-    else echo ""; fi)
-
-RAYLIB_LIB := $(shell \
-    if pkg-config --exists raylib 2>/dev/null; then pkg-config --libs raylib; \
-    elif [ -f /usr/local/lib/libraylib.a ]; then echo "/usr/local/lib/libraylib.a"; \
-    else echo "-lraylib"; fi)
-
+# ============================================================
+# Windows (cmd + MinGW)
+# ============================================================
 ifeq ($(OS),Windows_NT)
-    EXECUTAVEL      := logic_gates.exe
-    COMANDO_EXECUTAR:= .\logic_gates.exe
-    CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
-    LDFLAGS := $(RAYLIB_LIB) -lopengl32 -lgdi32 -lwinmm -lm
-    define CRIAR_PASTA
-        if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
-    endef
+
+# Caminho do Raylib — edite ou passe via: make RAYLIB_PATH=C:/meu/raylib
+RAYLIB_PATH ?= C:/raylib
+
+EXECUTAVEL       := logic_gates.exe
+COMANDO_EXECUTAR := logic_gates.exe
+
+RAYLIB_INC := -I$(RAYLIB_PATH)/include
+RAYLIB_LIB := -L$(RAYLIB_PATH)/lib -lraylib -lopengl32 -lgdi32 -lwinmm -lm
+
+CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
+LDFLAGS := $(RAYLIB_LIB)
+
+define CRIAR_PASTA
+	if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
+endef
+
+# ============================================================
+# Linux / macOS
+# ============================================================
 else
-    EXECUTAVEL      := logic_gates
-    COMANDO_EXECUTAR:= ./logic_gates
-    CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
-    LDFLAGS := $(RAYLIB_LIB) -lm -ldl -lpthread -lX11 -lXrandr -lXi -lXcursor -lXinerama
-    define CRIAR_PASTA
-        mkdir -p $(1)
-    endef
+
+EXECUTAVEL       := logic_gates
+COMANDO_EXECUTAR := ./logic_gates
+
+# Detecta Raylib: pkg-config > /usr/local > fallback
+ifeq ($(shell pkg-config --exists raylib 2>/dev/null && echo yes),yes)
+    RAYLIB_INC := $(shell pkg-config --cflags raylib)
+    RAYLIB_LIB := $(shell pkg-config --libs raylib)
+else ifneq ($(wildcard /usr/local/include/raylib.h),)
+    RAYLIB_INC := -I/usr/local/include
+    RAYLIB_LIB := /usr/local/lib/libraylib.a
+else
+    RAYLIB_INC :=
+    RAYLIB_LIB := -lraylib
 endif
 
+CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
+LDFLAGS := $(RAYLIB_LIB) -lm -ldl -lpthread -lX11 -lXrandr -lXi -lXcursor -lXinerama
+
+define CRIAR_PASTA
+	mkdir -p $(1)
+endef
+
+endif
+
+# ============================================================
+# Regras
+# ============================================================
 .PHONY: all run executar clean limpar
 
 all: $(EXECUTAVEL)
@@ -56,7 +82,7 @@ $(EXECUTAVEL): $(OBJETOS)
 	@echo ""
 
 build/%.o: src/%.c
-	@$(call CRIAR_PASTA,$(dir $@))
+	$(call CRIAR_PASTA,$(dir $@))
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(EXECUTAVEL)
