@@ -1,0 +1,4 @@
+build/
+logic_gates
+logic_gates.exe
+*.o
