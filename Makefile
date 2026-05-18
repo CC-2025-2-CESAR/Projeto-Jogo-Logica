@@ -1,43 +1,45 @@
 # ============================================================================
-# Makefile - nome_indefinido
+# Makefile - Logic Gates Adventure
 # ============================================================================
 #
-# Estrutura modular:
-#   src/core/         loop principal, contrato (tipos.h), colisao
-#   src/entidades/    jogador, inimigos, magias, obstaculos
-#   src/sistemas/     profecia, onda, cartas, dados, salvamento
-#   src/interface/    hud
-#
-# Cada modulo eh uma pasta. O Makefile descobre automaticamente todos os
-# .c e adiciona cada subpasta no -I do compilador, entao os #include
-# continuam podendo ser por nome simples (ex.: #include "tipos.h").
+# Estrutura:
+#   src/core/         main.c, game.c, tipos.h
+#   src/entidades/    player.c
+#   src/sistemas/     logica.c, fases.c
+#   src/interface/    ui.c
 # ============================================================================
 
-CC := gcc
+CC         := gcc
 PKG_CONFIG := pkg-config
 
-# Descobre todos os .c em src/ e em qualquer subpasta direta de src/.
-FONTES := $(wildcard src/*.c) $(wildcard src/*/*.c)
-
-# -I para cada modulo, pra que #include "header.h" funcione sem precisar
-# escrever o caminho completo.
+FONTES   := $(wildcard src/*.c) $(wildcard src/*/*.c)
 INCLUDES := -Isrc -Isrc/core -Isrc/entidades -Isrc/sistemas -Isrc/interface
 
-OBJETOS := $(patsubst src/%.c,build/%.o,$(FONTES))
+OBJETOS  := $(patsubst src/%.c,build/%.o,$(FONTES))
+
+RAYLIB_INC := $(shell \
+    if pkg-config --exists raylib 2>/dev/null; then pkg-config --cflags raylib; \
+    elif [ -f /usr/local/include/raylib.h ]; then echo "-I/usr/local/include"; \
+    else echo ""; fi)
+
+RAYLIB_LIB := $(shell \
+    if pkg-config --exists raylib 2>/dev/null; then pkg-config --libs raylib; \
+    elif [ -f /usr/local/lib/libraylib.a ]; then echo "/usr/local/lib/libraylib.a"; \
+    else echo "-lraylib"; fi)
 
 ifeq ($(OS),Windows_NT)
-    EXECUTAVEL := nome_indefinido.exe
-    COMANDO_EXECUTAR := .\nome_indefinido.exe
-    CFLAGS := -Wall -Wextra -std=c11 -g $(INCLUDES) $(shell $(PKG_CONFIG) --cflags raylib)
-    LDFLAGS := $(shell $(PKG_CONFIG) --libs raylib) -lopengl32 -lgdi32 -lwinmm -lm
+    EXECUTAVEL      := logic_gates.exe
+    COMANDO_EXECUTAR:= .\logic_gates.exe
+    CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
+    LDFLAGS := $(RAYLIB_LIB) -lopengl32 -lgdi32 -lwinmm -lm
     define CRIAR_PASTA
         if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
     endef
 else
-    EXECUTAVEL := nome_indefinido
-    COMANDO_EXECUTAR := ./nome_indefinido
-    CFLAGS := -Wall -Wextra -std=c11 -g $(INCLUDES) $(shell $(PKG_CONFIG) --cflags raylib)
-    LDFLAGS := $(shell $(PKG_CONFIG) --libs raylib) -lm
+    EXECUTAVEL      := logic_gates
+    COMANDO_EXECUTAR:= ./logic_gates
+    CFLAGS  := -Wall -Wextra -std=c11 -g $(INCLUDES) $(RAYLIB_INC)
+    LDFLAGS := $(RAYLIB_LIB) -lm -ldl -lpthread -lX11 -lXrandr -lXi -lXcursor -lXinerama
     define CRIAR_PASTA
         mkdir -p $(1)
     endef
@@ -49,9 +51,9 @@ all: $(EXECUTAVEL)
 
 $(EXECUTAVEL): $(OBJETOS)
 	$(CC) $(OBJETOS) -o $@ $(LDFLAGS)
-	@echo.
-	@echo Base compilada com sucesso.
-	@echo.
+	@echo ""
+	@echo "==> Logic Gates Adventure compilado com sucesso!"
+	@echo ""
 
 build/%.o: src/%.c
 	@$(call CRIAR_PASTA,$(dir $@))
@@ -65,10 +67,9 @@ executar: run
 clean:
 ifeq ($(OS),Windows_NT)
 	@if exist build rmdir /S /Q build
-	@if exist nome_indefinido.exe del /Q nome_indefinido.exe
-	@if exist nome_indefinido del /Q nome_indefinido
+	@if exist logic_gates.exe del /Q logic_gates.exe
 else
-	rm -rf build nome_indefinido nome_indefinido.exe
+	rm -rf build logic_gates logic_gates.exe
 endif
 
 limpar: clean
