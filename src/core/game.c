@@ -12,20 +12,24 @@
 
 /* Desenha o cenario: plataformas, botoes e porta */
 static void desenhar_cenario(const Fase *fase) {
+    /* Plataformas */
     for (int i = 0; i < fase->qtd_plataformas; i++) {
         DrawRectangleRec(fase->plataformas[i].rect, fase->plataformas[i].cor);
         DrawRectangleLinesEx(fase->plataformas[i].rect, 2, (Color){0,0,0,80});
     }
 
+    /* Botoes */
     for (int i = 0; i < fase->qtd_botoes; i++) {
         const Botao *b = &fase->botoes[i];
         Color cor = b->ativo ? b->cor_ativo : b->cor_inativo;
         DrawRectangleRec(b->rect, cor);
         DrawRectangleLinesEx(b->rect, 2, WHITE);
+        /* Label da variavel */
         DrawText(b->label,
                  (int)(b->rect.x + b->rect.width/2  - MeasureText(b->label, 18)/2),
                  (int)(b->rect.y + b->rect.height/2 - 9),
                  18, WHITE);
+        /* Estado V/F abaixo */
         const char *vf = b->ativo ? "V" : "F";
         Color cvf = b->ativo ? (Color){50,255,50,255} : (Color){255,80,80,255};
         DrawText(vf,
@@ -34,8 +38,10 @@ static void desenhar_cenario(const Fase *fase) {
                  14, cvf);
     }
 
+    /* Porta */
     const Porta *p = &fase->porta;
     if (p->aberta) {
+        /* Porta aberta: contorno verde */
         DrawRectangleLinesEx(p->rect, 4, (Color){50,255,50,255});
         DrawText("ABERTA",
                  (int)(p->rect.x + p->rect.width/2 - MeasureText("ABERTA",14)/2),
@@ -43,6 +49,7 @@ static void desenhar_cenario(const Fase *fase) {
     } else {
         DrawRectangleRec(p->rect, (Color){180,60,20,255});
         DrawRectangleLinesEx(p->rect, 3, (Color){220,100,40,255});
+        /* Proposicao acima da porta */
         DrawText(fase->titulo_prop,
                  (int)(p->rect.x + p->rect.width/2 - MeasureText(fase->titulo_prop, 16)/2),
                  (int)(p->rect.y - 26), 16, (Color){255,220,80,255});
@@ -83,6 +90,7 @@ void game_atualizar(EstadoJogo *g) {
 
     switch (g->estado_atual) {
 
+    /* ---------- MENU ---------- */
     case ESTADO_MENU: {
         if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP))   g->opcao_menu = (g->opcao_menu + 2) % 3;
         if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN)) g->opcao_menu = (g->opcao_menu + 1) % 3;
@@ -101,23 +109,28 @@ void game_atualizar(EstadoJogo *g) {
         break;
     }
 
+    /* ---------- CREDITOS ---------- */
     case ESTADO_CREDITOS: {
         if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER))
             g->estado_atual = ESTADO_MENU;
         break;
     }
 
+    /* ---------- JOGANDO ---------- */
     case ESTADO_JOGANDO: {
         if (IsKeyPressed(KEY_ESCAPE)) { g->estado_atual = ESTADO_MENU; break; }
 
+        /* Reiniciar fase */
         if (IsKeyPressed(KEY_R)) {
             fase_carregar(&g->fase_atual, g->num_fase);
             player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
             break;
         }
 
+        /* Atualizar jogador */
         player_atualizar(&g->jogador, &g->fase_atual, dt);
 
+        /* Interacao com botoes */
         if (IsKeyPressed(KEY_E)) {
             int idx = botao_proximo(&g->fase_atual, &g->jogador);
             if (idx >= 0) {
@@ -127,8 +140,10 @@ void game_atualizar(EstadoJogo *g) {
             }
         }
 
+        /* Avaliar logica e abrir/fechar porta */
         g->fase_atual.porta.aberta = logica_avaliar(&g->fase_atual);
 
+        /* Verifica se jogador entrou na porta aberta */
         if (g->fase_atual.porta.aberta &&
             CheckCollisionRecs(g->jogador.rect, g->fase_atual.porta.rect)) {
             g->timer_transicao = 0;
@@ -137,6 +152,7 @@ void game_atualizar(EstadoJogo *g) {
         break;
     }
 
+    /* ---------- FASE COMPLETA ---------- */
     case ESTADO_FASE_COMPLETA: {
         g->timer_transicao += dt;
         if ((IsKeyPressed(KEY_ENTER) || g->timer_transicao > 3.0f)) {
@@ -152,6 +168,7 @@ void game_atualizar(EstadoJogo *g) {
         break;
     }
 
+    /* ---------- VITORIA ---------- */
     case ESTADO_VITORIA: {
         if (IsKeyPressed(KEY_ENTER)) {
             g->num_fase = 0;
@@ -181,14 +198,21 @@ void game_desenhar(const EstadoJogo *g) {
         break;
 
     case ESTADO_JOGANDO: {
+        /* Fundo */
         ClearBackground((Color){ 20, 20, 45, 255 });
+        /* Cenario */
         desenhar_cenario(&g->fase_atual);
+        /* Jogador */
         player_desenhar(&g->jogador);
+        /* HUD */
         ui_desenhar_hud(&g->fase_atual);
+        /* Painel logico */
         ui_desenhar_painel_logico(&g->fase_atual);
+        /* Numero da fase no topo esquerdo */
         char buf[32];
         snprintf(buf, sizeof(buf), "FASE %d / %d", g->num_fase + 1, fase_total());
         DrawText(buf, 10, 58, 20, (Color){200,200,200,220});
+        /* Indicador de interacao proximo */
         {
             int idx = botao_proximo(&g->fase_atual, &g->jogador);
             if (idx >= 0) {
@@ -221,5 +245,5 @@ void game_desenhar(const EstadoJogo *g) {
  * FINALIZACAO
  * ========================================================================== */
 void game_finalizar(EstadoJogo *g) {
-    (void)g;
+    (void)g; /* nada a liberar por ora */
 }

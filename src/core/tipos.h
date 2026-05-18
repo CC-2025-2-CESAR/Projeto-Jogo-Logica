@@ -39,7 +39,7 @@ typedef enum {
 typedef enum {
     PROP_E,           /* P /\ Q          */
     PROP_OU,          /* P \/ Q          */
-    PROP_NAO_P_E_Q,   /* ~P /\ Q         */
+    PROP_NAO_P_E_Q,   /* ¬P /\ Q         */
     PROP_IMPLICA,     /* (P /\ Q) -> R   */
     PROP_BICONDICIONAL /* P <-> Q        */
 } TipoProposicao;

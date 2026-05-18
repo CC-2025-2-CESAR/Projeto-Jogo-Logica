@@ -10,10 +10,10 @@ bool logica_avaliar(const Fase *fase) {
     bool R = fase->variaveis[2];
 
     switch (fase->proposicao) {
-        case PROP_E:             return P && Q;
-        case PROP_OU:            return P || Q;
-        case PROP_NAO_P_E_Q:     return (!P) && Q;
-        case PROP_IMPLICA:       return (!(P && Q)) || R;   /* (P /\ Q) -> R */
+        case PROP_E:            return P && Q;
+        case PROP_OU:           return P || Q;
+        case PROP_NAO_P_E_Q:    return (!P) && Q;
+        case PROP_IMPLICA:      return (!(P && Q)) || R;   /* (P /\ Q) -> R */
         case PROP_BICONDICIONAL: return P == Q;
     }
     return false;
