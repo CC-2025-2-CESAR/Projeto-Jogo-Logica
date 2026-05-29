@@ -3,7 +3,7 @@
 
 #include "tipos.h"
 
-#define NUM_FASES 3
+#define NUM_FASES 5
 
 /* Preenche a struct Fase com os dados da fase indicada (0-based) */
 void fase_carregar(Fase *fase, int num);

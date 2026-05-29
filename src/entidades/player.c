@@ -30,6 +30,7 @@ void player_atualizar(Jogador *j, const Fase *fase, float dt) {
     /* Colisao com plataformas */
     j->no_chao = false;
     for (int i = 0; i < fase->qtd_plataformas; i++) {
+        if (fase->plataformas[i].colapsada) continue;
         Rectangle plat = fase->plataformas[i].rect;
         if (CheckCollisionRecs(j->rect, plat)) {
             /* Vindo de cima — pousa no topo */

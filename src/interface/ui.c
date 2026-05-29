@@ -97,9 +97,15 @@ void ui_desenhar_painel_logico(const Fase *fase) {
     char l1[64], l2[64], l3[64];
     logica_descricao(fase, l1, l2, l3);
 
-    bool resultado = logica_avaliar(fase);
-    Color cor_fundo = resultado ? (Color){0,60,0,210} : (Color){60,0,0,210};
-    Color cor_borda = resultado ? (Color){50,220,50,255} : (Color){220,50,50,255};
+    bool confirmado = fase->porta.aberta;
+    bool resultado  = confirmado && logica_avaliar(fase);
+
+    Color cor_fundo = confirmado
+        ? (resultado ? (Color){0,60,0,210}    : (Color){60,0,0,210})
+        : (Color){20,20,55,210};
+    Color cor_borda = confirmado
+        ? (resultado ? (Color){50,220,50,255} : (Color){220,50,50,255})
+        : (Color){80,80,160,255};
 
     int px = LARGURA_TELA - 380, py = 58, pw = 372, ph = 120;
     DrawRectangle(px, py, pw, ph, cor_fundo);
@@ -107,8 +113,14 @@ void ui_desenhar_painel_logico(const Fase *fase) {
 
     DrawText("[ AVALIACAO LOGICA ]", px + 8, py + 6,  16, (Color){200,200,200,230});
     DrawText(l1,                     px + 8, py + 30, 18, WHITE);
-    DrawText(l2,                     px + 8, py + 54, 18, (Color){255,230,80,255});
-    DrawText(l3,                     px + 8, py + 80, 20, cor_borda);
+
+    if (confirmado) {
+        DrawText(l2, px + 8, py + 54, 18, (Color){255,230,80,255});
+        DrawText(l3, px + 8, py + 80, 20, cor_borda);
+    } else {
+        DrawText(fase->titulo_prop,               px + 8, py + 54, 18, (Color){180,180,220,200});
+        DrawText("Confirme na porta para saber!", px + 8, py + 80, 15, (Color){120,120,170,200});
+    }
 }
 
 /* ============================================================================
@@ -124,6 +136,81 @@ void ui_desenhar_fase_completa(int num_fase) {
     DrawText("Pressione ENTER para a proxima fase",
              640 - MeasureText("Pressione ENTER para a proxima fase", 24)/2,
              400, 24, (Color){200,220,255,220});
+}
+
+/* ============================================================================
+ * TIMER (contagem regressiva)
+ * ========================================================================== */
+void ui_desenhar_timer(float tempo) {
+    int seg = (int)(tempo + 0.9999f);
+    if (seg < 0) seg = 0;
+
+    Color cor;
+    if      (tempo > 15.0f) cor = WHITE;
+    else if (tempo > 10.0f) cor = (Color){255, 220, 50,  255};
+    else if (tempo > 5.0f)  cor = (Color){255, 130, 20,  255};
+    else                    cor = (Color){255,  50, 50,  255};
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%02ds", seg);
+
+    /* Caixa de fundo */
+    int fs = 28;
+    int tw = MeasureText(buf, fs);
+    int bx = 640 - tw/2 - 10, by = 57;
+    int bw = tw + 20,          bh = fs + 10;
+    DrawRectangle(bx, by, bw, bh, (Color){0, 0, 0, 160});
+    DrawRectangleLinesEx((Rectangle){bx, by, bw, bh}, 2, cor);
+    DrawText(buf, bx + 10, by + 5, fs, cor);
+
+    /* Barra de progresso abaixo */
+    float frac = tempo / 45.0f;
+    if (frac < 0.0f) frac = 0.0f;
+    if (frac > 1.0f) frac = 1.0f;
+    int px = bx, py = by + bh + 3, pw = bw, ph = 6;
+    DrawRectangle(px, py, pw, ph, (Color){50, 50, 50, 200});
+    DrawRectangle(px, py, (int)(pw * frac), ph, cor);
+}
+
+/* ============================================================================
+ * TELA DE GAME OVER
+ * ========================================================================== */
+void ui_desenhar_game_over(MotivoGameOver motivo) {
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){0,0,0,190});
+
+    switch (motivo) {
+        case MOTIVO_RESPOSTA_ERRADA:
+            DrawText("RESPOSTA INCORRETA!",
+                     640 - MeasureText("RESPOSTA INCORRETA!", 56)/2,
+                     210, 56, (Color){255, 70, 70, 255});
+            DrawText("Pense bem antes de confirmar!",
+                     640 - MeasureText("Pense bem antes de confirmar!", 26)/2,
+                     290, 26, (Color){255, 160, 80, 255});
+            break;
+        case MOTIVO_TEMPO_ESGOTADO:
+            DrawText("ACABOU SEU TEMPO!",
+                     640 - MeasureText("ACABOU SEU TEMPO!", 56)/2,
+                     210, 56, (Color){255, 160, 30, 255});
+            DrawText("Voce demorou demais para responder.",
+                     640 - MeasureText("Voce demorou demais para responder.", 26)/2,
+                     290, 26, (Color){255, 200, 100, 255});
+            break;
+        case MOTIVO_INIMIGO:
+            DrawText("O INIMIGO TE PEGOU!",
+                     640 - MeasureText("O INIMIGO TE PEGOU!", 56)/2,
+                     210, 56, (Color){220, 50, 50, 255});
+            DrawText("Fique de olho no quadrado vermelho!",
+                     640 - MeasureText("Fique de olho no quadrado vermelho!", 26)/2,
+                     290, 26, (Color){255, 130, 130, 255});
+            break;
+    }
+
+    DrawText("Voltando ao Nivel 1...",
+             640 - MeasureText("Voltando ao Nivel 1...", 24)/2,
+             340, 24, WHITE);
+    DrawText("Pressione ENTER para reiniciar",
+             640 - MeasureText("Pressione ENTER para reiniciar", 20)/2,
+             420, 20, (Color){180, 200, 255, 200});
 }
 
 /* ============================================================================

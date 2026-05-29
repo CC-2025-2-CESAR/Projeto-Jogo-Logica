@@ -14,7 +14,7 @@
 
 #define MAX_PLATAFORMAS   16
 #define MAX_BOTOES        4
-#define MAX_VARS_LOGICAS  3   /* P, Q, R */
+#define MAX_VARS_LOGICAS  4   /* P, Q, R, S */
 
 /* Fisica */
 #define GRAVIDADE         1200.0f
@@ -31,6 +31,7 @@ typedef enum {
     ESTADO_CREDITOS,
     ESTADO_JOGANDO,
     ESTADO_FASE_COMPLETA,
+    ESTADO_GAME_OVER,
     ESTADO_VITORIA,
     ESTADO_SAIR
 } EstadoAtual;
@@ -40,8 +41,10 @@ typedef enum {
     PROP_E,           /* P /\ Q          */
     PROP_OU,          /* P \/ Q          */
     PROP_NAO_P_E_Q,   /* ¬P /\ Q         */
-    PROP_IMPLICA,     /* (P /\ Q) -> R   */
-    PROP_BICONDICIONAL /* P <-> Q        */
+    PROP_IMPLICA,     /* (P /\ Q) -> R         */
+    PROP_BICONDICIONAL, /* P <-> Q             */
+    PROP_NAND_R,        /* (~P \/ ~Q) /\ R            */
+    PROP_BICOND_IMPL    /* (P <-> Q) /\ (R -> S)     */
 } TipoProposicao;
 
 /* ============================================================================
@@ -57,7 +60,17 @@ typedef struct {
 typedef struct {
     Rectangle rect;
     Color     cor;
+    bool      instavel;       /* colapsa quando o jogador pisa */
+    bool      acionada;       /* contagem regressiva iniciada   */
+    float     timer_colapso;  /* segundos ate colapsar          */
+    bool      colapsada;      /* ja desapareceu                 */
 } Plataforma;
+
+typedef struct {
+    Vector2 pos;
+    float   speed;
+    bool    ativo;
+} Inimigo;
 
 /* Botao/alavanca que o jogador interage para alterar P, Q ou R */
 typedef struct {
@@ -88,7 +101,16 @@ typedef struct {
     char         dica[96];
     int          num_vars_usadas;  /* quantas variaveis esta fase usa */
     Vector2      pos_inicial_jogador;
+    Rectangle    botao_confirmar;    /* botao de confirmacao proximo a porta */
+    bool         tem_inimigo;
+    Inimigo      inimigo;
 } Fase;
+
+typedef enum {
+    MOTIVO_RESPOSTA_ERRADA = 0,
+    MOTIVO_TEMPO_ESGOTADO  = 1,
+    MOTIVO_INIMIGO         = 2
+} MotivoGameOver;
 
 /* ============================================================================
  * ESTADO RAIZ
@@ -100,6 +122,8 @@ typedef struct {
     int         num_fase;       /* 0-based */
     int         opcao_menu;
     float       timer_transicao;
+    float          timer_fase;       /* contagem regressiva de 45s */
+    MotivoGameOver motivo_game_over;
 } EstadoJogo;
 
 #endif /* TIPOS_H */

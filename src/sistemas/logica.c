@@ -15,6 +15,8 @@ bool logica_avaliar(const Fase *fase) {
         case PROP_NAO_P_E_Q:    return (!P) && Q;
         case PROP_IMPLICA:      return (!(P && Q)) || R;   /* (P /\ Q) -> R */
         case PROP_BICONDICIONAL: return P == Q;
+        case PROP_NAND_R:        return !(P && Q) && R;
+        case PROP_BICOND_IMPL:   return (P == Q) && (!R || fase->variaveis[3]);
     }
     return false;
 }
@@ -52,5 +54,17 @@ void logica_descricao(const Fase *fase, char *out_linha1, char *out_linha2, char
             snprintf(out_linha2, 64, "P <-> Q = %s", res);
             snprintf(out_linha3, 64, "Porta: %s", resultado ? "ABERTA" : "FECHADA");
             break;
+        case PROP_NAND_R:
+            snprintf(out_linha1, 64, "P = %s,  Q = %s,  R = %s", vf(P), vf(Q), vf(R));
+            snprintf(out_linha2, 64, "~(P/\\Q) = %s,  /\\ R = %s", vf(!(P&&Q)), vf(R));
+            snprintf(out_linha3, 64, "Porta: %s", resultado ? "ABERTA" : "FECHADA");
+            break;
+        case PROP_BICOND_IMPL: {
+            bool S = fase->variaveis[3];
+            snprintf(out_linha1, 64, "P=%s  Q=%s  R=%s  S=%s", vf(P), vf(Q), vf(R), vf(S));
+            snprintf(out_linha2, 64, "P<->Q=%s,  R->S=%s", vf(P == Q), vf(!R || S));
+            snprintf(out_linha3, 64, "Porta: %s", resultado ? "ABERTA" : "FECHADA");
+            break;
+        }
     }
 }

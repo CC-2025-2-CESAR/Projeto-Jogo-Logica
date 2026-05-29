@@ -5,6 +5,7 @@
 #include "ui.h"
 #include "raylib.h"
 #include <stdio.h>
+#include <math.h>
 
 /* ============================================================================
  * AUXILIARES INTERNOS
@@ -14,8 +15,20 @@
 static void desenhar_cenario(const Fase *fase) {
     /* Plataformas */
     for (int i = 0; i < fase->qtd_plataformas; i++) {
-        DrawRectangleRec(fase->plataformas[i].rect, fase->plataformas[i].cor);
-        DrawRectangleLinesEx(fase->plataformas[i].rect, 2, (Color){0,0,0,80});
+        const Plataforma *pl = &fase->plataformas[i];
+        if (pl->colapsada) continue;
+        DrawRectangleRec(pl->rect, pl->cor);
+        DrawRectangleLinesEx(pl->rect, 2, (Color){0,0,0,80});
+    }
+
+    /* Inimigo */
+    if (fase->tem_inimigo && fase->inimigo.ativo) {
+        float ex = fase->inimigo.pos.x;
+        float ey = fase->inimigo.pos.y;
+        DrawRectangle((int)ex, (int)ey, 32, 32, (Color){220, 30, 30, 255});
+        DrawRectangleLinesEx((Rectangle){ex, ey, 32, 32}, 2, (Color){255, 110, 110, 255});
+        DrawRectangle((int)ex + 5,  (int)ey + 8, 6, 6, (Color){255, 220, 0, 255});
+        DrawRectangle((int)ex + 21, (int)ey + 8, 6, 6, (Color){255, 220, 0, 255});
     }
 
     /* Botoes */
@@ -56,6 +69,16 @@ static void desenhar_cenario(const Fase *fase) {
         DrawText("FECHADA",
                  (int)(p->rect.x + p->rect.width/2 - MeasureText("FECHADA",12)/2),
                  (int)(p->rect.y - 44), 12, (Color){255,80,80,220});
+
+        /* Botao de confirmacao */
+        Rectangle bc = fase->botao_confirmar;
+        DrawRectangleRec(bc, (Color){180, 140, 20, 255});
+        DrawRectangleLinesEx(bc, 2, (Color){255, 220, 60, 255});
+        const char *txt = "CONFIRMAR";
+        DrawText(txt,
+                 (int)(bc.x + bc.width/2 - MeasureText(txt, 12)/2),
+                 (int)(bc.y + bc.height/2 - 6),
+                 12, (Color){20, 10, 0, 255});
     }
 }
 
@@ -70,6 +93,14 @@ static int botao_proximo(const Fase *fase, const Jogador *j) {
     return -1;
 }
 
+/* Verifica se jogador esta proximo do botao de confirmacao */
+static bool confirmar_proximo(const Fase *fase, const Jogador *j) {
+    Rectangle area = fase->botao_confirmar;
+    area.x -= 20; area.y -= 20;
+    area.width += 40; area.height += 40;
+    return CheckCollisionRecs(j->rect, area);
+}
+
 /* ============================================================================
  * INICIALIZACAO
  * ========================================================================== */
@@ -78,6 +109,7 @@ void game_inicializar(EstadoJogo *g) {
     g->num_fase        = 0;
     g->opcao_menu      = 0;
     g->timer_transicao = 0;
+    g->timer_fase      = 45.0f;
     fase_carregar(&g->fase_atual, 0);
     player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
 }
@@ -96,7 +128,8 @@ void game_atualizar(EstadoJogo *g) {
         if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN)) g->opcao_menu = (g->opcao_menu + 1) % 3;
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) {
             if (g->opcao_menu == 0) {
-                g->num_fase = 0;
+                g->num_fase   = 0;
+                g->timer_fase = 45.0f;
                 fase_carregar(&g->fase_atual, 0);
                 player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
                 g->estado_atual = ESTADO_JOGANDO;
@@ -122,26 +155,81 @@ void game_atualizar(EstadoJogo *g) {
 
         /* Reiniciar fase */
         if (IsKeyPressed(KEY_R)) {
+            g->timer_fase = 45.0f;
             fase_carregar(&g->fase_atual, g->num_fase);
             player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
+            break;
+        }
+
+        /* Contagem regressiva */
+        g->timer_fase -= dt;
+        if (g->timer_fase <= 0.0f) {
+            g->timer_fase        = 0.0f;
+            g->timer_transicao   = 0;
+            g->motivo_game_over  = MOTIVO_TEMPO_ESGOTADO;
+            g->estado_atual      = ESTADO_GAME_OVER;
             break;
         }
 
         /* Atualizar jogador */
         player_atualizar(&g->jogador, &g->fase_atual, dt);
 
-        /* Interacao com botoes */
+        /* Interacao com botoes e botao de confirmacao */
         if (IsKeyPressed(KEY_E)) {
             int idx = botao_proximo(&g->fase_atual, &g->jogador);
             if (idx >= 0) {
                 Botao *b = &g->fase_atual.botoes[idx];
                 b->ativo = !b->ativo;
                 g->fase_atual.variaveis[b->variavel_idx] = b->ativo;
+            } else if (!g->fase_atual.porta.aberta &&
+                       confirmar_proximo(&g->fase_atual, &g->jogador)) {
+                if (logica_avaliar(&g->fase_atual)) {
+                    g->fase_atual.porta.aberta = true;
+                } else {
+                    g->timer_transicao  = 0;
+                    g->motivo_game_over = MOTIVO_RESPOSTA_ERRADA;
+                    g->estado_atual     = ESTADO_GAME_OVER;
+                }
             }
         }
 
-        /* Avaliar logica e abrir/fechar porta */
-        g->fase_atual.porta.aberta = logica_avaliar(&g->fase_atual);
+        /* Plataformas instaveis */
+        for (int i = 0; i < g->fase_atual.qtd_plataformas; i++) {
+            Plataforma *pl = &g->fase_atual.plataformas[i];
+            if (!pl->instavel || pl->colapsada) continue;
+            bool em_cima =
+                g->jogador.no_chao &&
+                g->jogador.rect.y + g->jogador.rect.height >= pl->rect.y - 2 &&
+                g->jogador.rect.y + g->jogador.rect.height <= pl->rect.y + pl->rect.height + 5 &&
+                g->jogador.rect.x + g->jogador.rect.width  > pl->rect.x &&
+                g->jogador.rect.x < pl->rect.x + pl->rect.width;
+            if (em_cima && !pl->acionada) pl->acionada = true;
+            if (pl->acionada) {
+                pl->timer_colapso -= dt;
+                if (pl->timer_colapso <= 0.0f) pl->colapsada = true;
+            }
+        }
+
+        /* Inimigo perseguidor */
+        if (g->fase_atual.tem_inimigo && g->fase_atual.inimigo.ativo) {
+            Inimigo *en = &g->fase_atual.inimigo;
+            float cx = g->jogador.rect.x + LARGURA_JOGADOR / 2.0f;
+            float cy = g->jogador.rect.y + ALTURA_JOGADOR  / 2.0f;
+            float dx = cx - (en->pos.x + 16);
+            float dy = cy - (en->pos.y + 16);
+            float dist = sqrtf(dx*dx + dy*dy);
+            if (dist > 1.0f) {
+                en->pos.x += (dx / dist) * en->speed * dt;
+                en->pos.y += (dy / dist) * en->speed * dt;
+            }
+            Rectangle er = { en->pos.x, en->pos.y, 32, 32 };
+            if (CheckCollisionRecs(g->jogador.rect, er)) {
+                g->timer_transicao  = 0;
+                g->motivo_game_over = MOTIVO_INIMIGO;
+                g->estado_atual     = ESTADO_GAME_OVER;
+                break;
+            }
+        }
 
         /* Verifica se jogador entrou na porta aberta */
         if (g->fase_atual.porta.aberta &&
@@ -160,10 +248,24 @@ void game_atualizar(EstadoJogo *g) {
             if (g->num_fase >= fase_total()) {
                 g->estado_atual = ESTADO_VITORIA;
             } else {
+                g->timer_fase = 45.0f;
                 fase_carregar(&g->fase_atual, g->num_fase);
                 player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
                 g->estado_atual = ESTADO_JOGANDO;
             }
+        }
+        break;
+    }
+
+    /* ---------- GAME OVER ---------- */
+    case ESTADO_GAME_OVER: {
+        g->timer_transicao += dt;
+        if (IsKeyPressed(KEY_ENTER) || g->timer_transicao > 3.0f) {
+            g->num_fase   = 0;
+            g->timer_fase = 45.0f;
+            fase_carregar(&g->fase_atual, 0);
+            player_inicializar(&g->jogador, g->fase_atual.pos_inicial_jogador);
+            g->estado_atual = ESTADO_JOGANDO;
         }
         break;
     }
@@ -212,6 +314,8 @@ void game_desenhar(const EstadoJogo *g) {
         char buf[32];
         snprintf(buf, sizeof(buf), "FASE %d / %d", g->num_fase + 1, fase_total());
         DrawText(buf, 10, 58, 20, (Color){200,200,200,220});
+        /* Timer */
+        ui_desenhar_timer(g->timer_fase);
         /* Indicador de interacao proximo */
         {
             int idx = botao_proximo(&g->fase_atual, &g->jogador);
@@ -220,6 +324,13 @@ void game_desenhar(const EstadoJogo *g) {
                 DrawText("[E]",
                          (int)(b->rect.x + b->rect.width/2 - MeasureText("[E]",16)/2),
                          (int)(b->rect.y - 24), 16, (Color){255,255,80,255});
+            } else if (!g->fase_atual.porta.aberta &&
+                       confirmar_proximo(&g->fase_atual, &g->jogador)) {
+                Rectangle bc = g->fase_atual.botao_confirmar;
+                const char *hint = "[E] CONFIRMAR";
+                DrawText(hint,
+                         (int)(bc.x + bc.width/2 - MeasureText(hint,15)/2),
+                         (int)(bc.y - 24), 15, (Color){255,220,60,255});
             }
         }
         break;
@@ -231,6 +342,13 @@ void game_desenhar(const EstadoJogo *g) {
         player_desenhar(&g->jogador);
         ui_desenhar_painel_logico(&g->fase_atual);
         ui_desenhar_fase_completa(g->num_fase);
+        break;
+
+    case ESTADO_GAME_OVER:
+        ClearBackground((Color){ 20, 20, 45, 255 });
+        desenhar_cenario(&g->fase_atual);
+        player_desenhar(&g->jogador);
+        ui_desenhar_game_over(g->motivo_game_over);
         break;
 
     case ESTADO_VITORIA:
